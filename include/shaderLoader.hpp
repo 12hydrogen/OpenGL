@@ -11,62 +11,65 @@
 #include <initializer_list>
 #include <map>
 
-using json = nlohmann::json;
-
-#define ERROR_LOG_BUFFER_SIZE 5120
-
-using namespace std;
-
-class LOADER_SIGN shader
+namespace opengl
 {
-private:
-	GLenum shaderType;
+	using json = nlohmann::json;
 
-	GLuint shaderId;
-public:
-	shader(const string &filename, GLenum shaderType);
-	~shader();
+	#define ERROR_LOG_BUFFER_SIZE 5120
 
-	GLuint getShader() const
+	using namespace std;
+
+	class LOADER_SIGN shader
 	{
-		return shaderId;
-	}
-};
+	private:
+		GLenum shaderType;
 
-class LOADER_SIGN uniformSetter
-{
-private:
-	GLint position;
-public:
-	uniformSetter();
-	uniformSetter(GLint position);
+		GLuint shaderId;
+	public:
+		shader(const string &filename, GLenum shaderType);
+		~shader();
 
-	void operator=(const initializer_list<float> vector) const;
-	void operator=(const initializer_list<int> vector) const;
-	void operator=(const initializer_list<bool> vector) const;
-	void operator=(const initializer_list<glm::mat4> vector) const;
-};
+		GLuint getShader() const
+		{
+			return shaderId;
+		}
+	};
 
-class LOADER_SIGN shaderProgram
-{
-private:
-	GLuint programId;
-
-	map<string, uniformSetter> setterList;
-
-	void linkProgram(shader &vShader, shader &fShader);
-public:
-	shaderProgram();
-	shaderProgram(const string &vShader, const string &fShader);
-	shaderProgram(const json &jsonFile);
-	~shaderProgram();
-
-	void useProgram() const;
-
-	GLuint getProgram() const
+	class LOADER_SIGN uniformSetter
 	{
-		return programId;
-	}
+	private:
+		GLint position;
+	public:
+		uniformSetter();
+		uniformSetter(GLint position);
 
-	const uniformSetter& operator[](const string &name);
-};
+		void operator=(const initializer_list<float> vector) const;
+		void operator=(const initializer_list<int> vector) const;
+		void operator=(const initializer_list<bool> vector) const;
+		void operator=(const initializer_list<glm::mat4> vector) const;
+	};
+
+	class LOADER_SIGN shaderProgram
+	{
+	private:
+		GLuint programId;
+
+		map<string, uniformSetter> setterList;
+
+		void linkProgram(shader &vShader, shader &fShader);
+	public:
+		shaderProgram();
+		shaderProgram(const string &vShader, const string &fShader);
+		shaderProgram(const json &jsonFile);
+		~shaderProgram();
+
+		void useProgram() const;
+
+		GLuint getProgram() const
+		{
+			return programId;
+		}
+
+		const uniformSetter& operator[](const string &name);
+	};
+}

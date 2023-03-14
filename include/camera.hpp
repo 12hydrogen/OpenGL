@@ -52,7 +52,7 @@ private:
 		lookAtShouldUpdate = true;
 	}
 public:
-	camera(const glm::vec3 &position, GLfloat yaw = 0.0f, GLfloat pitch = 0.0f, GLfloat zoom = 45.0f, GLfloat moveSpeed = 4.0f, GLfloat viewSpeed = 0.02f):
+	camera(const glm::vec3 &position, GLfloat yaw = 0.0f, GLfloat pitch = 0.0f, GLfloat zoom = 45.0f, GLfloat moveSpeed = 4.0f, GLfloat viewSpeed = 0.05f):
 	position(position),
 	yaw(yaw),
 	pitch(pitch),
@@ -84,7 +84,7 @@ public:
 			position += delta * moveSpeed * right;
 			break;
 			default:
-			throw "Argument error.";
+			throw error("Argument error.");
 		}
 		lookAtShouldUpdate = true;
 	}

@@ -8,9 +8,11 @@
 
 #include <streambuf>
 
+using namespace opengl;
+
 void framebufferCallback(GLFWwindow *window, GLint width, GLint height);
 
-void keyboradInput(GLFWwindow *window, GLdouble delta);
+void keyboardInput(GLFWwindow *window, GLdouble delta);
 
 void keyboardCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
@@ -48,7 +50,7 @@ GLint main(GLint argc, GLchar **argv)
 	if (window == NULL)
 	{
 		glfwTerminate();
-		throw "Window creation failed.";
+		throw error("Window creation failed.");
 	}
 	glfwMakeContextCurrent(window);
 
@@ -56,7 +58,7 @@ GLint main(GLint argc, GLchar **argv)
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
 	{
 		glfwTerminate();
-		throw "GLAD loader failed.";
+		throw error("GLAD loader failed.");
 	}
 
 	glViewport(0, 0, 800, 600);
@@ -116,7 +118,7 @@ GLint main(GLint argc, GLchar **argv)
 		// Input
 		deltaPerFrame = glfwGetTime() - lastFrameTime;
 		lastFrameTime = glfwGetTime();
-		keyboradInput(window, deltaPerFrame);
+		keyboardInput(window, deltaPerFrame);
 
 		// Matrix operation
 		model = glm::rotate(glm::mat4(1.0f), (float)glfwGetTime(), glm::vec3(0.5f, 1.0f, 0.0f));
@@ -164,7 +166,7 @@ void framebufferCallback(GLFWwindow *window, GLint width, GLint height)
 	screenHeight = height;
 }
 
-void keyboradInput(GLFWwindow *window, GLdouble delta)
+void keyboardInput(GLFWwindow *window, GLdouble delta)
 {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE))
 	{
