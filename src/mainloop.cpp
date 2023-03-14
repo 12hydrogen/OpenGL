@@ -1,6 +1,5 @@
+#include <interface.hpp>
 #include <arrayLoader.hpp>
-#include <shaderLoader.hpp>
-#include <textureLoader.hpp>
 #include <camera.hpp>
 
 #include <cmath>
@@ -109,7 +108,7 @@ GLint main(GLint argc, GLchar **argv)
 	glm::mat4 model(1.0f), view(1.0f), projection(1.0f);
 
 	// Default shader program
-	auto &sPro = oArray[0]["box"].getShaderProgram();
+	auto &shaderProgram = oArray[0]["box"].getShaderProgram();
 
 	GLdouble lastFrameTime = glfwGetTime();
 	while (!glfwWindowShouldClose(window))
@@ -130,8 +129,8 @@ GLint main(GLint argc, GLchar **argv)
 
 		// Render actual object
 		// simpleProgram["mixRate"] = {mixRate};
-		sPro.useProgram();
-		sPro["mixRate"] = {mixRate};
+		shaderProgram.useProgram();
+		shaderProgram["mixRate"] = {mixRate};
 		oArray->draw(model, view, projection);
 
 		// Buffer swap
