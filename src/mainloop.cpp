@@ -1,6 +1,6 @@
-#include <interface.hpp>
-#include <arrayLoader.hpp>
-#include <camera.hpp>
+#include "interface.hpp"
+#include "arrayLoader.hpp"
+#include "camera.hpp"
 
 #include <cmath>
 

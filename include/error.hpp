@@ -8,13 +8,14 @@ namespace opengl
 	{
 	private:
 		std::string info;
+		std::string more;
 	public:
-		error(const std::string &info):
-		info(info) {}
+		error(const std::string &info, const std::string &more = std::string()):
+		info(info), more(more) {}
 
 		std::string what() const
 		{
-			return info;
+			return info + " Info: " + more + "\n";
 		}
 	};
 }

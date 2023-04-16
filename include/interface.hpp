@@ -3,10 +3,14 @@
 #include "arrayLoader.hpp"
 #include "camera.hpp"
 
+#include <thread>
+#include <atomic>
+
 namespace opengl
 {
-	class window;
+	using namespace std;
 
+	class window;
 
 	// Interaction with single input device, using callback
 	template <typename T>
@@ -42,7 +46,8 @@ namespace opengl
 	class window
 	{
 	private:
-		static map<GLFWwindow*, window*> callbackMap;
+		static map<GLFWwindow*, window*> existingWindow;
+		static map<GLFWwindow*, thread*> windowThread;
 
 		static bool initialized;
 
@@ -80,7 +85,7 @@ namespace opengl
 			{
 				glfwMakeContextCurrent(window);
 				glViewport(0, 0, width, height);
-				abstractWindowInfo *tempPtr = callbackMap.at(window)->params;
+				abstractWindowInfo *tempPtr = existingWindow.at(window)->params;
 				tempPtr->width = width;
 				tempPtr->height = height;
 			}
@@ -92,7 +97,7 @@ namespace opengl
 		{
 			try
 			{
-				callbackMap.at(window)->runKeyboard(key, scancode, action, mods);
+				existingWindow.at(window)->runKeyboard(key, scancode, action, mods);
 			}
 			catch (std::out_of_range &e)
 			{}
@@ -101,7 +106,7 @@ namespace opengl
 		{
 			try
 			{
-				callbackMap.at(window)->runScroll(xOffset, yOffset);
+				existingWindow.at(window)->runScroll(xOffset, yOffset);
 			}
 			catch (std::out_of_range &e)
 			{}
@@ -110,7 +115,7 @@ namespace opengl
 		{
 			try
 			{
-				callbackMap.at(window)->runMouse(xPos, yPos);
+				existingWindow.at(window)->runMouse(xPos, yPos);
 			}
 			catch (std::out_of_range &e)
 			{}
@@ -163,34 +168,40 @@ namespace opengl
 				glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 				if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
 				{
+					const char *desp;
+					int code = glfwGetError(&desp);
 					glfwTerminate();
-					throw error("GLAD loader init failed.");
+					throw error("GLAD loader init failed.", desp);
 				}
 				initialized = true;
 			}
 			// Create window
 			windowPtr = glfwCreateWindow(params->width, params->height, params->title, NULL, NULL);
 			if (windowPtr == NULL)
-				throw error("Window create failed.");
+			{
+				const char *desp;
+				int code = glfwGetError(&desp);
+				throw error("Window create failed.", desp);
+			}
 
 			glfwMakeContextCurrent(windowPtr);
 
 			glViewport(0, 0, params->width, params->height);
 
 			// Set callback
-			glfwSetFramebufferSizeCallback(windowPtr, framebufferCallback);
+			glfwSetFramebufferSizeCallback(windowPtr, frameBufferCallback);
 			glfwSetCursorPosCallback(windowPtr, globalMouseCallback);
 			glfwSetScrollCallback(windowPtr, globalScrollCallback);
 			glfwSetKeyCallback(windowPtr, globalKeyboardCallback);
 
 			glEnable(GL_DEPTH_TEST);
 
-			callbackMap.emplace(std::pair(windowPtr, this));
+			existingWindow.emplace(std::pair(windowPtr, this));
 		}
 		~window()
 		{
-			callbackMap.erase(windowPtr);
-			if (callbackMap.empty())
+			existingWindow.erase(windowPtr);
+			if (existingWindow.empty())
 			{
 				glfwTerminate();
 				initialized = false;

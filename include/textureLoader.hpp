@@ -1,5 +1,5 @@
 #pragma once
-#include "loader.hpp"
+#include "gl.hpp"
 
 #define STB_IMAGE_IMPLEMENTATION
 

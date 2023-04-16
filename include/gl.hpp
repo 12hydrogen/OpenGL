@@ -1,8 +1,7 @@
-extern "C"
-{
-	#include <glad/glad.h>
-	#include <GLFW/glfw3.h>
-}
+#pragma once
+
+#include "glad/glad.h"
+#include "GLFW/glfw3.h"
 #include "error.hpp"
 
 #if defined(EXPORT)
