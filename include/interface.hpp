@@ -5,6 +5,7 @@
 
 #include <thread>
 #include <atomic>
+#include <any>
 
 namespace opengl
 {
@@ -25,9 +26,13 @@ namespace opengl
 		friend class window;
 	};
 
-	using keyboardInteract = interaction<void (*)(window*, int, int, int, int)>;
-	using scrollInteract = interaction<void (*)(window*, double, double)>;
-	using mouseInteract = interaction<void (*)(window*, double, double)>;
+	using keyboardFunction = void (*)(window*, int, int, int, int);
+	using scrollFunction = void (*)(window*, double, double);
+	using mouseFunction = void (*)(window*, double, double);
+
+	using keyboardInteract = interaction<keyboardFunction>;
+	using scrollInteract = interaction<scrollFunction>;
+	using mouseInteract = interaction<mouseFunction>;
 
 	// Interactions with mutiply input devices
 	class interactModel
@@ -39,6 +44,8 @@ namespace opengl
 	public:
 		interactModel(keyboardInteract k, scrollInteract s, mouseInteract m):
 		keyboard(k), scroll(s), mouse(m) {}
+		interactModel(keyboardFunction k, scrollFunction s, mouseFunction m):
+		keyboard(k), scroll(s), mouse(m) {}
 
 		friend class window;
 	};
@@ -47,11 +54,11 @@ namespace opengl
 	{
 	private:
 		static map<GLFWwindow*, window*> existingWindow;
-		static map<GLFWwindow*, thread*> windowThread;
 
 		static bool initialized;
 
 		GLFWwindow *windowPtr;
+		thread *windowThread;
 
 		// Callback processing inputs
 		interactModel model;
@@ -68,6 +75,57 @@ namespace opengl
 			model.mouse.callback(this, xPos, yPos);
 		}
 
+		static void defaultKeyboard(window* w, int key, int scancode, int action, int mods)
+		{
+			defaultWindowInfo *info = (defaultWindowInfo*)w->params;
+			switch (key)
+			{
+				case GLFW_KEY_ESCAPE:
+				{
+					glfwSetWindowShouldClose(w->windowPtr, true);
+					break;
+				}
+				case GLFW_KEY_W:
+				{
+					info->defaultCamera->move(FRONT, info->frameDelta);
+					break;
+				}
+				case GLFW_KEY_S:
+				{
+					info->defaultCamera->move(BACK, info->frameDelta);
+					break;
+				}
+				case GLFW_KEY_A:
+				{
+					info->defaultCamera->move(LEFT, info->frameDelta);
+					break;
+				}
+				case GLFW_KEY_D:
+				{
+					info->defaultCamera->move(RIGHT, info->frameDelta);
+					break;
+				}
+			}
+		}
+		static void defaultScroll(window* w, double xOffset, double yOffset)
+		{
+			defaultWindowInfo *info = (defaultWindowInfo*)w->params;
+			info->defaultCamera->zoomChange(yOffset);
+		}
+		static void defaultMouse(window* w, double xPos, double yPos)
+		{
+			defaultWindowInfo *info = (defaultWindowInfo*)w->params;
+			if (info->firstEnter)
+			{
+				info->lastX = xPos;
+				info->lastY = yPos;
+				firstEnter = false;
+			}
+
+			baseCamera.view(xPos - info->lastX, info->lastY - yPos);
+			info->lastX = xPos;
+			info->lastY = yPos;
+		}
 		// Render circle
 		typedef void (*render)(window*);
 		render preRenderCallback;
@@ -129,8 +187,12 @@ namespace opengl
 			int width;
 			int height;
 
+			double frameDelta;
+			double lastX;
+			double lastY;
+
 			abstractWindowInfo(const char *title, int width, int height):
-			title(title), width(width), height(height) {}
+			title(title), width(width), height(height), frameDelta(0.0), lastX(0.0), lastY(0.0) {}
 		};
 
 		// Default render info
@@ -138,18 +200,23 @@ namespace opengl
 		{
 		public:
 			string jsonFileName;
+
 			objectArray *renderArray;
+			map<string, initializer_list<any>> uniform;
 			camera *defaultCamera;
+
 			vector<float> backgroundColor;
+			bool firstEnter;
 
 			defaultWindowInfo(const char *title, const char *jsonName, int width, int height, vector<float> bgColor):
 			abstractWindowInfo(title, width, height),
-			jsonFileName(jsonName), renderArray(NULL), defaultCamera(NULL), backgroundColor(bgColor) {}
+			jsonFileName(jsonName), renderArray(NULL), defaultCamera(NULL), backgroundColor(bgColor), firstEnter(true) {}
 		};
 
 		window(
-			interactModel model, int width = 800.0, int height = 600.0,
-			const char *title = "", const char *jsonName = "default.json",
+			const char *title = "", int width = 800.0, int height = 600.0,
+			interactModel model = interactModel(defaultKeyboard, defaultScroll, defaultMouse),
+			const char *jsonName = "default.json",
 			vector<float> backgroundColor = {0.2f, 0.3f, 0.3f, 1.0f}
 		):
 		model(model),
@@ -200,6 +267,7 @@ namespace opengl
 		}
 		~window()
 		{
+			glfwSetWindowShouldClose(windowPtr, true);
 			existingWindow.erase(windowPtr);
 			if (existingWindow.empty())
 			{
@@ -215,7 +283,10 @@ namespace opengl
 		{
 			double curTime = glfwGetTime();
 			if (counterInitialized)
+			{
+				params->frameDelta = curTime - lastFrame;
 				frameRate = 1.0 / (curTime - lastFrame);
+			}
 			else
 				counterInitialized = true;
 			lastFrame = curTime;
@@ -231,6 +302,9 @@ namespace opengl
 			}
 		}
 
+		void startDetach()
+		{}
+
 		void setPreRender(render preCallback)
 		{
 			preRenderCallback = preCallback;
@@ -242,12 +316,36 @@ namespace opengl
 
 		static void defaultPreRenderCallback(window *currentWindow)
 		{
-			defaultWindowInfo *temp = (defaultWindowInfo*)currentWindow->params;
-			temp->renderArray = new objectArray(temp->jsonFileName);
-			temp->defaultCamera = new camera({0.0, 0.0, 0.0});
+			try
+			{
+				defaultWindowInfo *info = (defaultWindowInfo*)currentWindow->params;
+				info->renderArray = new objectArray(info->jsonFileName);
+				info->defaultCamera = new camera({0.0, 0.0, 0.0});
+			}
+			catch (json::parse_error &e)
+			{
+				throw error("Object reading failed.", e.what());
+			}
+			catch (error &e)
+			{
+				throw error("Camera init failed.", e.what());
+			}
 		}
 		static void defaultRenderCallback(window *currentWindow)
-		{}
+		{
+			defaultWindowInfo *info = (defaultWindowInfo*)currentWindow->params;
+			glClearColor(info->backgroundColor[0], info->backgroundColor[1], info->backgroundColor[2], info->backgroundColor[3]);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			for (auto &object : info->renderArray->getDefination())
+			{
+				const shaderProgram &temp = object.second.getShaderProgram();
+				for (auto uniformPair : info->uniform)
+				{
+					temp[uniformPair.first] = uniformPair.second;
+				}
+				object.second.draw();
+			}
+		}
 	};
 
 	bool window::initialized = false;

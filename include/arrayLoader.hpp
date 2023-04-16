@@ -101,6 +101,7 @@ namespace opengl
 		~singleObject();
 
 		shaderProgram& getShaderProgram();
+		const shaderProgram& getShaderProgram() const;
 		const map<string, texture>& getTextureList() const;
 
 		void genObjectBuffer(GLenum usage = GL_STATIC_DRAW, GLenum normalize = GL_FALSE);
@@ -124,6 +125,11 @@ namespace opengl
 
 		singleObject& operator[](const string &str);
 		const singleObject& operator[](const string &str) const;
+
+		const map<string, singleObject>& getDefination() const
+		{
+			return defination;
+		}
 
 		void draw(const glm::mat4 &preModel, const glm::mat4 &view, const glm::mat4 &projection);
 

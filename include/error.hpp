@@ -15,7 +15,7 @@ namespace opengl
 
 		std::string what() const
 		{
-			return info + " Info: " + more + "\n";
+			return info + (more.empty() ? "" : " Info: " + more + "\n") ;
 		}
 	};
 }

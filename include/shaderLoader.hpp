@@ -10,6 +10,7 @@
 #include <string>
 #include <initializer_list>
 #include <map>
+#include <variant>
 
 namespace opengl
 {
@@ -47,6 +48,8 @@ namespace opengl
 		void operator=(const initializer_list<int> vector) const;
 		void operator=(const initializer_list<bool> vector) const;
 		void operator=(const initializer_list<glm::mat4> vector) const;
+
+		void operator=(const initializer_list<any> vector) const;
 	};
 
 	class LOADER_SIGN shaderProgram
@@ -54,7 +57,7 @@ namespace opengl
 	private:
 		GLuint programId;
 
-		map<string, uniformSetter> setterList;
+		static map<string, uniformSetter> setterList;
 
 		void linkProgram(shader &vShader, shader &fShader);
 	public:
@@ -70,6 +73,6 @@ namespace opengl
 			return programId;
 		}
 
-		const uniformSetter& operator[](const string &name);
+		const uniformSetter& operator[](const string &name) const;
 	};
 }

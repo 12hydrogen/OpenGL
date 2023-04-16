@@ -180,6 +180,10 @@ namespace opengl
 	{
 		return sProgram;
 	}
+	const shaderProgram& singleObject::getShaderProgram() const
+	{
+		return sProgram;
+	}
 	const map<string, texture>& singleObject::getTextureList() const
 	{
 		return textureList;

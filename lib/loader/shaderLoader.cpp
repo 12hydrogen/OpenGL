@@ -120,6 +120,65 @@ namespace opengl
 			throw error("Invalid argument.");
 		}
 	}
+	void uniformSetter::operator=(const initializer_list<any> vector) const
+	{
+		auto beg = vector.begin();
+		switch(vector.size())
+		{
+			case 1:
+			{
+				if (beg[0].type() == typeid(glm::mat4))
+					glUniformMatrix4fv(position, 1, GL_FALSE, glm::value_ptr(any_cast<glm::mat4>(beg[0])));
+				else if (beg[0].type() == typeid(float))
+					glUniform1f(position, any_cast<float>(beg[0]));
+				else if (beg[0].type() == typeid(int))
+					glUniform1i(position, any_cast<int>(beg[0]));
+				else if (beg[0].type() == typeid(bool))
+					glUniform1i(position, any_cast<int>(beg[0]));
+				else
+					throw error("Invalid argument.");
+			}
+			break;
+			case 2:
+			{
+				if (beg[0].type() == typeid(float))
+					glUniform2f(position, any_cast<float>(beg[0]), any_cast<float>(beg[1]));
+				else if (beg[0].type() == typeid(int))
+					glUniform2i(position, any_cast<int>(beg[0]), any_cast<int>(beg[1]));
+				else if (beg[0].type() == typeid(bool))
+					glUniform2i(position, any_cast<int>(beg[0]), any_cast<int>(beg[1]));
+				else
+					throw error("Invalid argument.");
+			}
+			break;
+			case 3:
+			{
+				if (beg[0].type() == typeid(float))
+					glUniform3f(position, any_cast<float>(beg[0]), any_cast<float>(beg[1]), any_cast<float>(beg[2]));
+				else if (beg[0].type() == typeid(int))
+					glUniform3i(position, any_cast<int>(beg[0]), any_cast<int>(beg[1]), any_cast<int>(beg[2]));
+				else if (beg[0].type() == typeid(bool))
+					glUniform3i(position, any_cast<int>(beg[0]), any_cast<int>(beg[1]), any_cast<int>(beg[2]));
+				else
+					throw error("Invalid argument.");
+			}
+			break;
+			case 4:
+			{
+				if (beg[0].type() == typeid(float))
+					glUniform4f(position, any_cast<float>(beg[0]), any_cast<float>(beg[1]), any_cast<float>(beg[2]), any_cast<float>(beg[3]));
+				else if (beg[0].type() == typeid(int))
+					glUniform4i(position, any_cast<int>(beg[0]), any_cast<int>(beg[1]), any_cast<int>(beg[2]), any_cast<int>(beg[3]));
+				else if (beg[0].type() == typeid(bool))
+					glUniform4i(position, any_cast<int>(beg[0]), any_cast<int>(beg[1]), any_cast<int>(beg[2]), any_cast<int>(beg[3]));
+				else
+					throw error("Invalid argument.");
+			}
+			break;
+			default:
+			throw error("Invalid argument.");
+		}
+	}
 
 	shaderProgram::shaderProgram()
 	{}
@@ -171,7 +230,7 @@ namespace opengl
 	{
 		glUseProgram(programId);
 	}
-	const uniformSetter& shaderProgram::operator[](const string &name)
+	const uniformSetter& shaderProgram::operator[](const string &name) const
 	{
 		if (setterList.find(name) == setterList.end())
 		{
