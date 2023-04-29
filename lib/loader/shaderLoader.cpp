@@ -1,4 +1,4 @@
-#include "shaderLoader.hpp"
+#include "loader/shaderLoader.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -12,7 +12,7 @@ namespace opengl
 		if (str.find_first_of(" \n\t") == str.npos)
 		{
 			ifstream file(str);
-			code.assign(istreambuf_iterator<char>(file), istreambuf_iterator<char>());
+			code.assign(istreambuf_iterator<GLchar>(file), istreambuf_iterator<GLchar>());
 			file.close();
 		}
 		else
@@ -31,7 +31,7 @@ namespace opengl
 		if (!successCode)
 		{
 			glGetShaderInfoLog(shaderId, ERROR_LOG_BUFFER_SIZE, NULL, status);
-			throw status;
+			throw error("Error compiling.", status);
 		}
 	}
 	shader::~shader()
@@ -45,7 +45,7 @@ namespace opengl
 	uniformSetter::uniformSetter(GLint position):
 	position(position)
 	{}
-	void uniformSetter::operator=(const initializer_list<float> vector) const
+	void uniformSetter::operator=(const initializer_list<float> &vector) const
 	{
 		auto beg = vector.begin();
 		switch(vector.size())
@@ -66,7 +66,31 @@ namespace opengl
 			throw error("Invalid argument.");
 		}
 	}
-	void uniformSetter::operator=(const initializer_list<int> vector) const
+	void uniformSetter::operator=(const vector<float> &vector) const
+	{
+		switch(vector.size())
+		{
+			case 1:
+			glUniform1f(position, vector[0]);
+			break;
+			case 2:
+			glUniform2f(position, vector[0], vector[1]);
+			break;
+			case 3:
+			glUniform3f(position, vector[0], vector[1], vector[2]);
+			break;
+			case 4:
+			glUniform4f(position, vector[0], vector[1], vector[2], vector[3]);
+			break;
+			default:
+			throw error("Invalid argument.");
+		}
+	}
+	void uniformSetter::operator=(const glm::vec3 &vector) const
+	{
+		glUniform3f(position, vector.r, vector.g, vector.b);
+	}
+	void uniformSetter::operator=(const initializer_list<int> &vector) const
 	{
 		auto beg = vector.begin();
 		switch(vector.size())
@@ -87,7 +111,7 @@ namespace opengl
 			throw error("Invalid argument.");
 		}
 	}
-	void uniformSetter::operator=(const initializer_list<bool> vector) const
+	void uniformSetter::operator=(const initializer_list<bool> &vector) const
 	{
 		auto beg = vector.begin();
 		switch(vector.size())
@@ -108,19 +132,15 @@ namespace opengl
 			throw error("Invalid argument.");
 		}
 	}
-	void uniformSetter::operator=(const initializer_list<glm::mat4> vector) const
+	void uniformSetter::operator=(const glm::mat4 &mat) const
 	{
-		auto beg = vector.begin();
-		switch(vector.size())
-		{
-			case 1:
-			glUniformMatrix4fv(position, 1, GL_FALSE, glm::value_ptr(beg[0]));
-			break;
-			default:
-			throw error("Invalid argument.");
-		}
+		glUniformMatrix4fv(position, 1, GL_FALSE, glm::value_ptr(mat));
 	}
-	void uniformSetter::operator=(const initializer_list<any> vector) const
+	void uniformSetter::operator=(const glm::mat3 &mat) const
+	{
+		glUniformMatrix3fv(position, 1, GL_FALSE, glm::value_ptr(mat));
+	}
+	void uniformSetter::operator=(const initializer_list<any> &vector) const
 	{
 		auto beg = vector.begin();
 		switch(vector.size())
@@ -184,12 +204,18 @@ namespace opengl
 	{}
 	shaderProgram::shaderProgram(const string &vShader, const string &fShader)
 	{
-		programId = glCreateProgram();
+		auto pos = regProgram.find(vShader + fShader);
+		if (pos == regProgram.end())
+		{
+			programId = glCreateProgram();
 
-		shader vertexShader(vShader, GL_VERTEX_SHADER);
-		shader fragmentShader(fShader, GL_FRAGMENT_SHADER);
+			shader vertexShader(vShader, GL_VERTEX_SHADER);
+			shader fragmentShader(fShader, GL_FRAGMENT_SHADER);
 
-		linkProgram(vertexShader, fragmentShader);
+			linkProgram(vertexShader, fragmentShader);
+		}
+		else
+			programId = pos->second;
 	}
 	shaderProgram::shaderProgram(const json &jsonFile)
 	{
@@ -199,13 +225,18 @@ namespace opengl
 			throw error("JSON format error.");
 		if (!(jsonFile["vertex"].is_string() && jsonFile["fragment"].is_string()))
 			throw error("Value type error.");
+		auto pos = regProgram.find(jsonFile["vertex"].get<string>() + jsonFile["fragment"].get<string>());
+		if (pos == regProgram.end())
+		{
+			programId = glCreateProgram();
 
-		programId = glCreateProgram();
+			shader vertexShader(jsonFile["vertex"].get<string>(), GL_VERTEX_SHADER);
+			shader fragmentShader(jsonFile["fragment"].get<string>(), GL_FRAGMENT_SHADER);
 
-		shader vertexShader(jsonFile["vertex"].get<string>(), GL_VERTEX_SHADER);
-		shader fragmentShader(jsonFile["fragment"].get<string>(), GL_FRAGMENT_SHADER);
-
-		linkProgram(vertexShader, fragmentShader);
+			linkProgram(vertexShader, fragmentShader);
+		}
+		else
+			programId = pos->second;
 	}
 	shaderProgram::~shaderProgram()
 	{
@@ -223,14 +254,14 @@ namespace opengl
 		if (!successCode)
 		{
 			glGetProgramInfoLog(programId, ERROR_LOG_BUFFER_SIZE, NULL, status);
-			throw status;
+			throw error("Error linking.", status);
 		}
 	}
 	void shaderProgram::useProgram() const
 	{
 		glUseProgram(programId);
 	}
-	const uniformSetter& shaderProgram::operator[](const string &name) const
+	uniformSetter& shaderProgram::operator[](const string &name)
 	{
 		if (setterList.find(name) == setterList.end())
 		{
@@ -238,4 +269,5 @@ namespace opengl
 		}
 		return setterList[name];
 	}
+	map<string, GLuint> shaderProgram::regProgram;
 }

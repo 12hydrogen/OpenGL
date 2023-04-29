@@ -55,12 +55,12 @@ namespace opengl
 		}
 	public:
 		camera(const glm::vec3 &position, GLfloat yaw = 0.0f, GLfloat pitch = 0.0f, GLfloat zoom = 45.0f, GLfloat moveSpeed = 4.0f, GLfloat viewSpeed = 0.05f):
-		position(position),
+		moveSpeed(moveSpeed),
+		viewSpeed(viewSpeed),
 		yaw(yaw),
 		pitch(pitch),
 		zoom(zoom),
-		moveSpeed(moveSpeed),
-		viewSpeed(viewSpeed),
+		position(position),
 		worldUp(glm::vec3(0.0f, 1.0f, 0.0f)),
 		lookAtShouldUpdate(true),
 		perspectiveShouldUpdate(true),
@@ -146,6 +146,15 @@ namespace opengl
 			}
 			lastRatio = HWratio;
 			return perspectiveCache;
+		}
+
+		glm::vec3 getPosition() const
+		{
+			return position;
+		}
+		glm::vec3 getFacing() const
+		{
+			return front;
 		}
 	};
 }

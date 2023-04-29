@@ -4,13 +4,12 @@
 # VS Code
 /.vscode
 
-# Lib Downloaded
-/download
-
 # Misc
-*.zip
+OpenGL*.zip
 
 # Build Misc
 *.a
-# Note that the current version of GLFW is compiled for certain platform and may not be suitable for other platform
-!libglfw3.a
+*.so
+*.lib
+*.dll
+main.exe

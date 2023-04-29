@@ -1,21 +1,23 @@
 #pragma once
 
 #include <string>
+#include <exception>
 
 namespace opengl
 {
-	class error
+	class error: public std::exception
 	{
 	private:
 		std::string info;
-		std::string more;
 	public:
-		error(const std::string &info, const std::string &more = std::string()):
-		info(info), more(more) {}
-
-		std::string what() const
+		error(const std::string &info, const std::string &more = std::string())
 		{
-			return info + (more.empty() ? "" : " Info: " + more + "\n") ;
+			this->info = info + (more.empty() ? "" : " Info: " + more + "\n");
+		}
+
+		const char* what() const noexcept
+		{
+			return info.c_str();
 		}
 	};
 }

@@ -1,4 +1,5 @@
-#include "arrayLoader.hpp"
+#include "loader/arrayLoader.hpp"
+#include "loader/modelLoader.hpp"
 
 #include <iostream>
 
@@ -8,26 +9,23 @@ namespace opengl
 {
 	// baseArray
 	template <typename T>
-	baseArray<T>::baseArray()
-	{}
-	template <typename T>
-	baseArray<T>::~baseArray()
-	{}
+	baseArray<T>::baseArray(const vector<T> &data):
+	data(data){}
 
 	template <typename T>
 	const T* baseArray<T>::getData()
 	{
-		return rawData.data();
+		return data.data();
 	}
 	template <typename T>
 	GLuint baseArray<T>::getLength() const
 	{
-		return rawData.size();
+		return data.size();
 	}
 	template <typename T>
 	GLuint baseArray<T>::getSize() const
 	{
-		return rawData.size() * sizeof(T);
+		return data.size() * sizeof(T);
 	}
 
 	template class baseArray<GLfloat>;
@@ -79,7 +77,7 @@ namespace opengl
 		if (!arrayFile["value"][0].is_number_float())
 			throw error("Value type error.");
 
-		rawData = arrayFile["value"].get<vector<GLfloat>>();
+		data = arrayFile["value"].get<vector<GLfloat>>();
 		depth = arrayFile["structure"].get<vector<GLuint>>();
 
 		for (auto i : depth)
@@ -87,10 +85,10 @@ namespace opengl
 			lengthPerCount += i;
 		}
 
-		if (rawData.size() % lengthPerCount != 0)
+		if (data.size() % lengthPerCount != 0)
 			throw error("Value incomplete.");
 
-		verticeCount = rawData.size() / lengthPerCount;
+		verticeCount = data.size() / lengthPerCount;
 
 	}
 
@@ -136,7 +134,7 @@ namespace opengl
 		if (!arrayFile["value"][0].is_number_unsigned())
 			throw error("Value type error.");
 
-		rawData = arrayFile["value"].get<vector<GLuint>>();
+		data = arrayFile["value"].get<vector<GLuint>>();
 
 		string primitiveStr = arrayFile["primitive"];
 
@@ -169,24 +167,24 @@ namespace opengl
 		json jsonFile = json::parse(file);
 		genObject(jsonFile);
 	}
-	singleObject::singleObject(const json &file)
+	singleObject::singleObject(const json &jsonObject)
 	{
-		genObject(file);
+		genObject(jsonObject);
 	}
 	singleObject::~singleObject()
 	{}
 
 	shaderProgram& singleObject::getShaderProgram()
 	{
-		return sProgram;
+		return *sProgram;
 	}
 	const shaderProgram& singleObject::getShaderProgram() const
 	{
-		return sProgram;
+		return *sProgram;
 	}
 	const map<string, texture>& singleObject::getTextureList() const
 	{
-		return textureList;
+		return *textureList;
 	}
 
 	void singleObject::genObjectBuffer(GLenum usage/* = GL_STATIC_DRAW*/, GLenum normalize/* = GL_FALSE*/)
@@ -195,32 +193,34 @@ namespace opengl
 		glGenVertexArrays(1, &arrayObject);
 		glBindVertexArray(arrayObject);
 		// Gen VBO
-		vArray.genBuffer(usage);
+		vArray->genBuffer(usage);
 		// Gen EBO
-		iArray.genBuffer(usage);
+		iArray->genBuffer(usage);
 		// Set VP
-		vArray.setVertexPointer(normalize);
+		vArray->setVertexPointer(normalize);
+		glBindVertexArray(0);
 	}
 
 	void singleObject::draw() const
 	{
 		glBindVertexArray(arrayObject);
-		glDrawElements(iArray.getPrimitive(), iArray.getLength(), GL_UNSIGNED_INT, 0);
+		glDrawElements(iArray->getPrimitive(), iArray->getLength(), GL_UNSIGNED_INT, 0);
 	}
 
-	void singleObject::genObject(const json &file)
+	void singleObject::genObject(const json &jsonObject)
 	{
-		if (!(file.is_object() && file.contains("vertex") && file.contains("indice") && file.contains("shader")))
+		if (!(jsonObject.is_object() && jsonObject.contains("vertex") && jsonObject.contains("indice") && jsonObject.contains("shader")))
 			throw error("JSON format error.");
-		vArray = vertexArray(file["vertex"]);
-		iArray = indiceArray(file["indice"]);
-		sProgram = shaderProgram(file["shader"]);
+		vArray = new vertexArray(jsonObject["vertex"]);
+		iArray = new indiceArray(jsonObject["indice"]);
+		sProgram = new shaderProgram(jsonObject["shader"]);
+		textureList = new map<string, texture>();
 
-		if (file.contains("texture"))
+		if (jsonObject.contains("texture"))
 		{
-			if (!file["texture"].is_array())
+			if (!jsonObject["texture"].is_array())
 				throw error("JSON format error.");
-			for (auto &singleTexture : file["texture"])
+			for (auto &singleTexture : jsonObject["texture"])
 			{
 				if (!singleTexture.is_object())
 					throw error("JSON format error.");
@@ -228,7 +228,8 @@ namespace opengl
 					throw error("JSON format error.");
 				if (!(singleTexture["file"].is_string() && singleTexture["type"].is_string()))
 					throw error("Value type error.");
-				textureList.insert_or_assign(singleTexture["name"].get<string>(), texture(singleTexture["file"].get<string>(), singleTexture["type"].get<string>()));
+				textureList->insert_or_assign(singleTexture["name"].get<string>(),
+				texture(singleTexture["file"].get<string>(), singleTexture["type"].get<string>()));
 			}
 		}
 	}
@@ -236,148 +237,365 @@ namespace opengl
 	// objectArray
 	objectArray::objectArray(const char *filename, bool gen/* = true*/)
 	{
-		// This function encounters problems, probably because of relative path
-		ifstream file(filename);
-		json jsonFile = json::parse(file);
-		file.close();
-		genArray(jsonFile, gen);
+		// This function encounters problems, probably because of a relative path
+		// Judge file type
+		string fn = filename;
+		string postfix = fn.substr(fn.find_first_of('.') + 1);
+		if (postfix.compare("json") == 0)
+		{
+			ifstream file(filename);
+			json jsonFile = json::parse(file);
+			file.close();
+			genArray(jsonFile, gen);
+		}
 	}
 	objectArray::objectArray(const string &filename, bool gen/* = true*/)
 	{
-		ifstream file(filename);
-		json jsonFile = json::parse(file);
-		file.close();
-		genArray(jsonFile, gen);
+		// Judge file type
+		string fn = filename;
+		string postfix = fn.substr(fn.find_first_of('.') + 1);
+		if (postfix.compare("json") == 0)
+		{
+			ifstream file(filename);
+			json jsonFile = json::parse(file);
+			file.close();
+			genArray(jsonFile, gen);
+		}
 	}
 	objectArray::objectArray(ifstream &file, bool gen/* = true*/)
 	{
 		json jsonFile = json::parse(file);
 		genArray(jsonFile, gen);
 	}
-	objectArray::objectArray(const json &file, bool gen/* = true*/)
+	objectArray::objectArray(const json &jsonObject, bool gen/* = true*/)
 	{
-		genArray(file, gen);
+		genArray(jsonObject, gen);
+	}
+	objectArray::~objectArray()
+	{
+		for (auto i : defination)
+		{
+			for (auto j : i.second)
+			{
+				delete j.vArray;
+				delete j.iArray;
+				delete j.textureList;
+			}
+		}
 	}
 
-	void objectArray::genArray(const json &file, bool gen)
+	void objectArray::genArray(const json &jsonObject, bool gen)
 	{
-		if (!file.is_array())
-			throw error("JSON format error.");
+		if (!jsonObject.is_array())
+			throw error("JSON format error.", "JSON root node is not array.");
 
-		for (GLuint i = 0; i < file.size(); i++)
+		for (GLuint i = 0; i < jsonObject.size(); i++)
 		{
 			// Basic confirm, json object with "type" and "name"
-			if (file[i].contains("type") && file[i].contains("name"))
+			// "type" is string and "name" is string
+			if (jsonObject[i].contains("type") && jsonObject[i].contains("name") &&
+				jsonObject[i]["type"].is_string() && jsonObject[i]["name"].is_string())
 			{
-				// "type" is string and "name" is string
-				if (file[i]["type"].is_string() && file[i]["name"].is_string())
+				string type = jsonObject[i]["type"].get<string>();
+				string name = jsonObject[i]["name"].get<string>();
+				// This is a defination to a object
+				// Defines the vertices of object
+				// Contains value of VBO and EBO
+				if (type.compare("defination") == 0)
 				{
-					string type = file[i]["type"].get<string>();
-					string name = file[i]["name"].get<string>();
-					// This is a defination to a object
-					// Defines the vertices of object
-					// Contains value of VBO and EBO
-					if (type.compare("defination") == 0)
-					{
-						// Create a singleObject for further resolve
-						defination.insert(make_pair(name, singleObject(file[i])));
-					}
-					// This is a usage to a object
-					// Contains coordinates to transform object to
-					else if (type.compare("usage") == 0 && file[i].contains("offset") && file[i].contains("model"))
-					{
-						if (file[i]["model"].is_string())
-						{
-							// Set the model mat name
-							usage[name].first = file[i]["model"].get<string>();
-						}
-						// Coordinates array
-						if (file[i]["offset"].is_array())
-						{
-							// Single coordinate
-							if (file[i]["offset"][0].is_array())
-							{
-								// Coordinate in float
-								if (file[i]["offset"][0][0].is_number_float())
-								{
-									// Insert if this object has not been used
-									if (usage.count(name) == 0)
-										usage.insert(make_pair(name, pair<string, vector<vector<GLfloat>>>()));
-									// Reserve space for performance
-									usage[name].second.reserve(usage[name].second.size() + file[i]["offset"].size());
-									for (auto &offsetArray : file[i]["offset"])
-									{
-										// Only accept 7 float, x, y, z, rotate, rotateX, rotateY, rotateZ
-										if (offsetArray.size() != 7)
-											continue;
-										// Direct convert
-										usage[name].second.emplace_back(offsetArray.get<vector<GLfloat>>());
-									}
-								}
-							}
-						}
-					}
+					// Create a singleObject for further resolve
+					genDefination(jsonObject[i], name);
 				}
+				// This is a usage to a object
+				// Contains coordinates to transform object to
+				else if (type.compare("usage") == 0)
+				{
+					genUsage(jsonObject[i], name);
+				}
+				else
+					throw error("JSON format error.", "Encountered unfamiliar object.");
 			}
+			else
+				throw error("JSON format error.", "Encountered undefined object.");
 		}
 		if (gen)
 		{
 			for (auto &i : defination)
 			{
-				i.second.genObjectBuffer();
+				for (auto j : i.second)
+				{
+					j.genObjectBuffer();
+				}
 			}
 		}
 	}
 
-	void objectArray::draw(const glm::mat4 &preModel, const glm::mat4 &view, const glm::mat4 &projection)
+	void objectArray::genDefination(const json &jsonObject, const string &name)
+	{
+		if (jsonObject.contains("model") && jsonObject["model"].is_object())
+		{
+			if (jsonObject["model"].contains("name") && jsonObject["model"]["name"].is_string())
+			{
+				scene raw(jsonObject["model"]["name"].get<string>());
+				function<singleObject&& (const plainModel&)> func = &genObject;
+				defination[name] = raw.map(func);
+			}
+			if (jsonObject.contains("shader") && jsonObject["shader"].is_object())
+			{
+				for (auto &obj : defination[name])
+				{
+					obj.sProgram = new shaderProgram(jsonObject["shader"]);
+				}
+			}
+		}
+		else
+		{
+			defination[name] = vector<singleObject>({singleObject(jsonObject)});
+			defination[name][0].genObjectBuffer();
+		}
+	}
+
+	singleObject&& objectArray::genObject(const plainModel &model)
+	{
+		singleObject *obj = new singleObject();
+
+		auto vRaw = model.rawVertex();
+		auto vSize = model.rawVertexSize();
+		auto iRaw = model.rawIndice();
+		auto iSize = model.rawIndiceSize();
+		obj->vArray = new vertexArray(vector<GLfloat>(vRaw, vRaw + vSize));
+		obj->iArray = new indiceArray(vector<GLuint>(iRaw, iRaw + iSize));
+		obj->sProgram = NULL;
+		obj->textureList = new map<string, texture>(model.textures);
+		obj->genObjectBuffer();
+
+		return move(*obj);
+	}
+
+	void objectArray::genUsage(const json &jsonObject, const string &name)
+	{
+		// Usage generation
+		const string attrName = "attribute";
+		// Attributes array
+		if (jsonObject[attrName].is_array())
+		{
+			if (usage.find(name) == usage.end())
+				usage.insert(make_pair(name, vector<objectUsage>()));
+			usage[name].reserve(jsonObject[attrName].size() + usage[name].size());
+			for (GLuint i = 0; i < jsonObject[attrName].size(); i++)
+			{
+				auto &attrObject = jsonObject[attrName][i];
+				if (attrObject.is_object())
+				{
+					usage[name].emplace_back(genUsageAttr(attrObject, name, i));
+				}
+				else
+					throw error("JSON format error.");
+			}
+		}
+		else
+			throw error("JSON format error.");
+	}
+	objectArray::objectUsage objectArray::genUsageAttr(const json &jsonObject, const string &name, GLuint id)
+	{
+		objectUsage ret = objectUsage();
+		if (jsonObject.contains("model"))
+		{
+			if (jsonObject["model"].is_array() && jsonObject["model"].size() == 3)
+			{
+				vector<GLfloat> temp = jsonObject["model"].get<vector<GLfloat>>();
+				ret.model = glm::vec3(temp[0], temp[1], temp[2]);
+			}
+			else
+				throw error("JSON format error.");
+		}
+		else
+			throw error("JSON format error.");
+		if (jsonObject.contains("rotate"))
+		{
+			if (jsonObject["rotate"].is_object() && jsonObject["rotate"].contains("axis") && jsonObject["rotate"].contains("degree"))
+			{
+				vector<GLfloat> temp = jsonObject["rotate"]["axis"].get<vector<GLfloat>>();
+				ret.rotateAxis = glm::vec3(temp[0], temp[1], temp[2]);
+				ret.rotateDegree = jsonObject["rotate"]["degree"].get<GLfloat>();
+			}
+			else
+				throw error("JSON format error.");
+		}
+		else
+		{
+			ret.rotateAxis = glm::vec3(0.0f);
+			ret.rotateDegree = 0.0f;
+		}
+		if (jsonObject.contains("light"))
+		{
+			if (jsonObject["light"].is_object())
+			{
+				if (jsonObject["light"].contains("material") && jsonObject["light"]["material"].is_object())
+				{
+					if (jsonObject["light"]["material"]["ambient"].is_array())
+					{
+						vector<GLfloat> temp = jsonObject["light"]["material"]["ambient"].get<vector<GLfloat>>();
+						ret.material.ambient = glm::vec3(temp[0], temp[1], temp[2]);
+					}
+					if (jsonObject["light"]["material"]["ambient"].is_array())
+					{
+						vector<GLfloat> temp = jsonObject["light"]["material"]["diffuse"].get<vector<GLfloat>>();
+						ret.material.diffuse = glm::vec3(temp[0], temp[1], temp[2]);
+					}
+					if (jsonObject["light"]["material"]["ambient"].is_array())
+					{
+						vector<GLfloat> temp = jsonObject["light"]["material"]["specular"].get<vector<GLfloat>>();
+						ret.material.specular = glm::vec3(temp[0], temp[1], temp[2]);
+					}
+					ret.material.shininess = jsonObject["light"]["material"]["shininess"].get<GLfloat>();
+				}
+				else
+				{
+					ret.material.ambient = glm::vec3(1.0f);
+					ret.material.diffuse = glm::vec3(1.0f);
+					ret.material.specular = glm::vec3(1.0f);
+					ret.material.shininess = 32.0f;
+				}
+				if (jsonObject["light"].contains("source") && jsonObject["light"]["source"].is_string() &&
+					jsonObject["light"].contains("color") && jsonObject["light"]["color"].is_array() &&
+					jsonObject["light"].contains("attenuation") && jsonObject["light"]["attenuation"].is_array() &&
+					jsonObject["light"].contains("strength") && jsonObject["light"]["strength"].is_array())
+				{
+					lightUsage usage(name, id, ret.model);
+
+					vector<GLfloat> temp = jsonObject["light"]["color"].get<vector<GLfloat>>();
+					usage.color = glm::vec3(temp[0], temp[1], temp[2]);
+					ret.color = new glm::vec3(temp[0], temp[1], temp[2]);
+
+					temp = jsonObject["light"]["strength"].get<vector<GLfloat>>();
+					usage.strength = glm::vec3(temp[0], temp[1], temp[2]);
+
+					temp = jsonObject["light"]["attenuation"].get<vector<GLfloat>>();
+					usage.attenuation = glm::vec3(temp[0], temp[1], temp[2]);
+
+					if (jsonObject["light"].contains("direction") && jsonObject["light"]["direction"].is_array())
+					{
+						temp = jsonObject["light"]["direction"].get<vector<GLfloat>>();
+						usage.direction = glm::vec3(temp[0], temp[1], temp[2]);
+					}
+					if (jsonObject["light"].contains("cutoff") && jsonObject["light"]["cutoff"].is_number())
+					{
+						usage.cutoff = glm::cos(glm::radians(jsonObject["light"]["cutoff"].get<GLfloat>()));
+					}
+					if (jsonObject["light"].contains("outerCutoff") && jsonObject["light"]["outerCutoff"].is_number())
+					{
+						usage.outerCutoff = glm::cos(glm::radians(jsonObject["light"]["outerCutoff"].get<GLfloat>()));
+					}
+					lightSource.emplace(make_pair(jsonObject["light"]["source"].get<string>(), usage));
+				}
+			}
+			else
+				throw error("JSON format error.");
+		}
+		else
+		{
+			ret.material.ambient = glm::vec3(1.0f);
+			ret.material.diffuse = glm::vec3(1.0f);
+			ret.material.specular = glm::vec3(1.0f);
+			ret.material.shininess = 32.0f;
+		}
+
+		return ret;
+	}
+
+	void objectArray::draw(const glm::mat4 &view, const glm::mat4 &projection, const glm::vec3 &viewPos, const glm::vec3 &viewFacing, void *globalInfo)
 	{
 		GLenum textureUnit = GL_TEXTURE0;
-		for (auto drawList: usage)
+		for (auto def: defination)
 		{
-			auto &sObj = defination[drawList.first];
-			auto &sProgram = sObj.getShaderProgram();
-			sProgram.useProgram();
-			sProgram["view"] = {view};
-			sProgram["projection"] = {projection};
-			for (auto &singleTexture : sObj.getTextureList())
+			for (auto single: def.second)
 			{
-				if (textureUnit > GL_TEXTURE16)
-					throw error("Too many texture unit.");
-				glActiveTexture(textureUnit);
-				singleTexture.second.useTexture();
-				sProgram[singleTexture.first] = {(int)(textureUnit - GL_TEXTURE0)};
-				textureUnit++;
-			}
-			if (defination.count(drawList.first) == 0)
-				continue;
-			for (auto drawSingle: drawList.second.second)
-			{
-				glm::mat4 model(1.0f);
-				model = glm::translate(model, glm::vec3(drawSingle[0], drawSingle[1], drawSingle[2]));
-				model = glm::rotate(model, glm::radians(drawSingle[3]), glm::vec3(drawSingle[4], drawSingle[5], drawSingle[6]));
-				model *= preModel;
-				sProgram[drawList.second.first] = {model};
-				sObj.draw();
+				auto &sProgram = single.getShaderProgram();
+				sProgram.useProgram();
+				sProgram["viewPos"] = viewPos;
+				sProgram["viewFacing"] = viewFacing;
+				sProgram["view"] = view;
+				sProgram["projection"] = projection;
+				for (auto &singleTexture : single.getTextureList())
+				{
+					if (textureUnit > GL_TEXTURE16)
+						throw error("Too many texture unit.");
+					glActiveTexture(textureUnit);
+					singleTexture.second.useTexture();
+					const uniformSetter &setter = sProgram[singleTexture.first];
+					setter = {(int)(textureUnit - GL_TEXTURE0)};
+					textureUnit++;
+				}
+				if (usage.count(def.first) == 0)
+					continue;
+				for (auto light : lightSource)
+				{
+					glm::vec4 pos = glm::vec4(light.second.pos, 1.0f);
+					if (usage[light.second.name][light.second.id].callback != NULL)
+						pos = usage[light.second.name][light.second.id].callback(globalInfo) * pos;
+					sProgram[light.first + ".pos"] = pos;
+					sProgram[light.first + ".color"] = light.second.color;
+					sProgram[light.first + ".strength"] = light.second.strength;
+					sProgram[light.first + ".attenuation"] = light.second.attenuation;
+					sProgram[light.first + ".direction"] = light.second.direction;
+					const auto &tempA = sProgram[light.first + ".cutoff"];
+					tempA = {light.second.cutoff};
+					const auto &tempB = sProgram[light.first + ".outerCutoff"];
+					tempB = {light.second.outerCutoff};
+				}
+				for (auto singleUsage: usage[def.first])
+				{
+					glm::mat4 model(1.0f);
+					model = glm::translate(model, singleUsage.model);
+					model = glm::rotate(model, glm::degrees(singleUsage.rotateDegree), singleUsage.rotateAxis);
+					if (singleUsage.callback != NULL)
+						model *= singleUsage.callback(globalInfo);
+					sProgram["model"] = model;
+					glm::mat3 normalMat = glm::transpose(glm::inverse(glm::mat3(model)));
+					sProgram["normalMat"] = normalMat;
+					if (singleUsage.color == NULL)
+					{
+						sProgram["material.ambient"] = singleUsage.material.ambient;
+						sProgram["material.diffuse"] = singleUsage.material.diffuse;
+						sProgram["material.specular"] = singleUsage.material.specular;
+						const auto &temp = sProgram["material.shininess"];
+						temp = {singleUsage.material.shininess};
+					}
+					else
+					{
+						sProgram["color"] = *singleUsage.color;
+					}
+					single.draw();
+				}
 			}
 		}
 	}
 
-	singleObject& objectArray::operator[](const string &str)
+	auto& objectArray::operator[](const string &str)
 	{
 		return defination[str];
 	}
-	const singleObject& objectArray::operator[](const string &str) const
+	const auto& objectArray::operator[](const string &str) const
 	{
 		return defination.at(str);
 	}
 
-	map<string, singleObject>& objectArray::getDefination()
+	map<string, vector<singleObject>>& objectArray::getDefination()
 	{
 		return defination;
 	}
-	const map<string, singleObject>& objectArray::getDefination() const
+	const map<string, vector<singleObject>>& objectArray::getDefination() const
 	{
 		return defination;
+	}
+	map<string, vector<objectArray::objectUsage>>& objectArray::getUsage()
+	{
+		return usage;
+	}
+	const map<string, vector<objectArray::objectUsage>>& objectArray::getUsage() const
+	{
+		return usage;
 	}
 
 	const map<string, GLenum> indiceArray::convertMap = {

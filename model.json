@@ -1,0 +1,121 @@
+[
+	{
+		"name": "nanosuit",
+		"type": "defination",
+		"model": {
+			"name": "nanosuit/nanosuit.obj"
+		},
+		"shader": {
+			"vertex": "nanosuit/nanosuit.vs",
+			"fragment": "nanosuit/nanosuit.fs"
+		}
+	},
+	{
+		"name": "nanosuit",
+		"type": "usage",
+		"attribute": [
+			{
+				"model": [0.0, 0.0, 0.0],
+				"rotate": {
+					"axis": [1.0, 0.3, 0.5],
+					"degree": 0.0
+				}
+			}
+		]
+	},
+	{
+		"name": "light",
+		"type": "defination",
+		"shader": {
+			"vertex": "nanosuit/nanosuit.vs",
+			"fragment": "nanosuit/light.fs"
+		},
+		"vertex": {
+			"structure": [
+				3
+			],
+			"value": [
+				-0.5, -0.5, -0.5,
+				 0.5, -0.5, -0.5,
+				-0.5,  0.5, -0.5,
+				 0.5,  0.5, -0.5,
+
+				-0.5, -0.5,  0.5,
+				 0.5, -0.5,  0.5,
+				-0.5,  0.5,  0.5,
+				 0.5,  0.5,  0.5
+			]
+		},
+		"indice": {
+			"primitive": "triangle",
+			"value": [
+				0, 3, 1,
+				3, 0, 2,
+
+				4, 5, 7,
+				7, 6, 4,
+
+				6, 2, 0,
+				0, 4, 6,
+
+				7, 1, 3,
+				1, 7, 5,
+
+				0, 1, 5,
+				5, 4, 0,
+
+				2, 7, 3,
+				7, 2, 6
+			]
+		}
+	},
+	{
+		"name": "light",
+		"type": "usage",
+		"attribute": [
+			{
+				"model": [3.0, 5.0, 0.0],
+				"rotate": {
+					"axis": [1.0, 0.3, 0.5],
+					"degree": 0.0
+				},
+				"light": {
+					"source": "white",
+					"color": [1.0, 1.0, 1.0],
+					"attenuation": [1.0, 0.045, 0.0075],
+					"strength": [0.2, 1.0, 1.0]
+				}
+			},
+			{
+				"model": [10.0, 10.0, 10.0],
+				"rotate": {
+					"axis": [1.0, 0.3, 0.5],
+					"degree": 0.0
+				},
+				"light": {
+					"source": "white_parallel",
+					"color": [1.0, 1.0, 1.0],
+					"direction": [1.0, 1.0, 1.0],
+					"attenuation": [1.0, 0.045, 0.0075],
+					"strength": [0.2, 1.0, 1.0]
+				}
+			},
+			{
+				"model": [-5.0, -5.0, -5.0],
+				"rotate": {
+					"axis": [1.0, 0.3, 0.5],
+					"degree": 0.0
+				},
+				"light": {
+					"source": "white_spotlight",
+					"color": [1.0, 1.0, 1.0],
+					"direction": [1.0, 1.0, 1.0],
+					"attenuation": [1.0, 0.045, 0.0075],
+					"cutoff": 1.0,
+					"outerCutoff": 10.0,
+					"strength": [0.2, 1.0, 1.0]
+				}
+			}
+		]
+	}
+]

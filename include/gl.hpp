@@ -5,9 +5,14 @@
 #include "error.hpp"
 
 #if defined(EXPORT)
-#define LOADER_SIGN __declspec(dllexport)
+#define DLL_SIGN __declspec(dllexport)
 #elif defined(IMPORT)
-#define LOADER_SIGN __declspec(dllimport)
+#define DLL_SIGN __declspec(dllimport)
 #else
-#define LOADER_SIGN
+#define DLL_SIGN
 #endif
+
+namespace opengl
+{
+    void glErrorAssert();
+}
